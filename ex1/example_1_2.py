@@ -52,12 +52,12 @@ def run_example():
 
     # You can comment in the following code to use the same example graph for
     # Exercise 1.3.
-    #
-    #print('# Exercise 1.3')
-    #for l in (0, 0.2, 0.5):
-    #    nodes, edges = make_graph(l)
-    #    print('lambda={:.1f}  =>  bruteforce returns {}'.format(
-    #        l, student.bruteforce(nodes, edges)))
+
+    print('# Exercise 1.3')
+    for l in (0, 0.2, 0.5):
+        nodes, edges = make_graph(l)
+        print('lambda={:.1f}  =>  bruteforce returns {}'.format(
+            l, student.bruteforce(nodes, edges)))
 
 
 if __name__ == '__main__':

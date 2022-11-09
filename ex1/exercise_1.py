@@ -2,7 +2,7 @@
 # This is the file where should insert your own code.
 #
 # Author: Your Name <your@email.com>
-
+import itertools
 
 # For exercise 1.2
 def evaluate_energy(nodes, edges, assignment):
@@ -17,19 +17,19 @@ def evaluate_energy(nodes, edges, assignment):
 
 # For exercise 1.3
 def bruteforce(nodes, edges):
-    assignment = [0] * len(nodes)
 
-    # print(edges)
+    energy_combinations = list(itertools.product(*[[i for i in range (len(node.costs))]for node in nodes]))
+
     min_energy = 999
     min_assignment = None
 
-    energy = evaluate_energy(nodes, edges, assignment)
-    if energy < min_energy:
-        min_energy = energy
-        min_assignment = assignment.copy()
+    for assignment in energy_combinations:
+        energy = evaluate_energy(nodes, edges, assignment)
+        if energy < min_energy:
+            min_energy = energy
+            min_assignment = assignment
 
-    if not min_assignment:
-        return None
+
     return (min_assignment, min_energy)
 
 

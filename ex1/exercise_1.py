@@ -104,16 +104,45 @@ def compute_min_marginals(nodes, edges):
 
 # For execise 1.6
 def dynamic_programming_tree(nodes, edges):
-    
-    for i in range(0, len(nodes) - 1):
-        for j in range(0, len(nodes) - 1):
-            for edge in edges:
-                if edge.left == i and edge.right == j:
-                    print(edge.costs)
 
-    F, ptr = None, None
+    edges = edge_cost(nodes, edges)
 
-    return F, ptr
+    # A leaf node is one that is only on the left side of an edge (in this case)
+    # Find a leaf node
+    leaf_idx = None
+    F = np.zeros((len(nodes), len(nodes[0].costs)))
+    ptr = np.zeros((len(nodes), len(nodes[0].costs)))
+
+    edges = edges.sort(key=lambda x: x.left)  # Sort the edges by the left node
+    no_leaf = []
+
+    for i in range(len(nodes)):
+        # If the node is not on the right side of any edge then it is a leaf node (in this case)
+        if all([edge.right != i for edge in edges]):
+            _, right = (
+                nodes.pop(i),
+                [edge for edge in edges if edge.left == i],
+            )  # Remove the leaf node from the list of nodes
+            no_leaf += right # This keeps track of the edges that are not leaf nodes so there is a entry for F and ptr
+            break
+        # Calculate the minimum cost for connecting the parent to the leaf
+        # This is the same as the dynamic programming algorithm
+        lefts = {left for (left, _) in edges[i].costs.keys()}
+        rights = {right for (_, right) in edges[i].costs.keys()}
+        temp = np.zeros(len(lefts))
+        if not i in no_leaf:
+            for right in rights:
+                for left in lefts:
+                    temp[left] = edges[i].costs[left, right]
+                F[i][right] = np.min(temp)
+                ptr[i][right] = np.argmin(temp)
+        else:
+            for right in rights:
+                for left in lefts:
+                    temp[left] = F[right][left] + edges[i].costs[left, right]
+
+                F[i][right] = np.min(temp)
+                ptr[i][right] = np.argmin(temp)
 
 
 def backtrack_tree(nodes, edges, F, ptr):

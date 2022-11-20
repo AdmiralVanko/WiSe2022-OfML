@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # This is the file where should insert your own code.
 #
-# Author: Your Name <your@email.com>
+# Author: Björn Bulkens bjoern.bulkens@stud.uni-heidelberg.de
 import itertools
+from PIL import Image
+from collections import namedtuple
 import numpy as np
 
 # For exercise 1.2
@@ -90,8 +92,8 @@ def backtrack(nodes, edges, F, ptr):
         if i == len(nodes) - 1:
             assignment[i] = np.argmin(F[i])
         else:
-            print(assignment[i + 1])
             assignment[i] = ptr[i][int(assignment[i + 1])]
+    assignment = assignment.astype(int)
 
     return assignment
 
@@ -123,7 +125,7 @@ def dynamic_programming_tree(nodes, edges):
                 nodes.pop(i),
                 [edge for edge in edges if edge.left == i],
             )  # Remove the leaf node from the list of nodes
-            no_leaf += right # This keeps track of the edges that are not leaf nodes so there is a entry for F and ptr
+            no_leaf += right  # This keeps track of the edges that are not leaf nodes so there is a entry for F and ptr
             break
         # Calculate the minimum cost for connecting the parent to the leaf
         # This is the same as the dynamic programming algorithm
@@ -148,3 +150,73 @@ def dynamic_programming_tree(nodes, edges):
 def backtrack_tree(nodes, edges, F, ptr):
     assignment = [0] * len(nodes)
     return assignment
+
+
+def seam_carving(image):
+
+    Node = namedtuple("Node", "costs")
+    Edge = namedtuple("Edge", "left right costs")
+
+    def del_hor(p):
+
+        p = np.concatenate(
+            (p[:, 0, :][:, None, :] * 10, p, p[:, -1, :][:, None, :] * 10), axis=1
+        )
+        return p[:, :-2, :] - p[:, 2:, :]
+
+    def del_ver(p):
+
+        p = np.concatenate(
+            (p[0, :, :][None, :, :] * 10, p, p[-1, :, :][None, :, :] * 10), axis=0
+        )
+
+        return p[:-2, :, :] - p[2:, :, :]
+
+    def remove_pixels(assignment, image):
+
+        return np.array(
+            [np.delete(row, assignment[i], axis=0) for i, row in enumerate(image)]
+        )
+
+    with Image.open(image) as image:
+        width, height = image.size
+        pixels = np.array(image, dtype=np.float64)
+
+        for i in range(width - height):
+            nodes = []
+            edges = []
+            nodevals = np.linalg.norm((del_ver(pixels)), axis=-1) + np.linalg.norm(
+                (del_hor(pixels)), axis=-1
+            )
+
+            for pixel_row in nodevals:
+                nodes.append(Node(costs=pixel_row))
+            for i in range(len(nodes) - 1):
+                edge_values = (
+                    np.arange(0, len(nodes[i].costs))[:, None]
+                    - np.arange(0, len(nodes[i].costs))[None, :]
+                ) ** 2
+
+                edges.append(
+                    Edge(
+                        left=i,
+                        right=i + 1,
+                        costs=dict(
+                            itertools.chain.from_iterable(
+                                [
+                                    [
+                                        [(x, y), edge_values[x, y]]
+                                        for x in range(len(edge_values[0]))
+                                    ]
+                                    for y in range(len(edge_values[1]))
+                                ]
+                            )
+                        ),
+                    )
+                )
+            intermediates = dynamic_programming(nodes, edges)
+            minimalpixels_vert = backtrack(nodes, edges, *intermediates)
+            pixels = remove_pixels(minimalpixels_vert, pixels)
+
+        image_converted = Image.fromarray(pixels.astype("uint8"), mode="RGB")
+        image_converted.save("tower_seam_carved.png")

@@ -1514,6 +1514,7 @@ def run_test():
     res = ilp.solve()
     assert res
     assert abs(ilp.objective.value() - ground_truth[1]) < 1e-4
+    print(student.ilp_to_labeling(nodes, edges, ilp, *temp))
     assert tuple(student.ilp_to_labeling(nodes, edges, ilp, *temp)) == ground_truth[0]
 
     print("Ok")

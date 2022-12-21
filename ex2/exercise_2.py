@@ -2,14 +2,11 @@
 import time
 from pulp import *
 import time
-import math
 import numpy as np
-import model_2_4 as model
+from model_2_4 import *
 from PIL import Image
 import numpy as np
 from collections import namedtuple
-import logging
-import math
 import os
 from PIL import Image
 
@@ -32,62 +29,48 @@ def evaluate_energy(nodes, edges, assignment):
 # Method that converts an graphical model into an linear program
 def convert_to_ilp(nodes, edges):
 
-    # mu1 for the nodes
-    mu1 = []
-    temp1 = []
-    counter = 0
-    for i in range(0, len(nodes)):
-        for j in range(0, len(nodes[i].costs)):
-            counter += 1
-            temp1.append(
-                LpVariable("Node" + str(i) + str(j) + str(counter), cat="Binary")
-            )
-        mu1.append(temp1)
-        temp1 = []
+    node_var = [
+        [LpVariable(f"Node{i}{j}", cat="Binary") for j in range(len(nodes[i].costs))]
+        for i in range(0, len(nodes))
+    ]
 
-    # mu2 for the edges
-    mu2 = []
-    temp2 = []
-    counter = 0
+    # edge_var for the edges
+    edge_var = []
+
     for i in range(0, len(edges)):
-        for (a, b), c in edges[i].costs.items():
-            counter += 1
-            temp2.append(
+        temp = []
+        for (a, b), _ in edges[i].costs.items():
+
+            temp.append(
                 LpVariable(
-                    "Edge"
-                    + str(edges[i].left)
-                    + str(edges[i].right)
-                    + str(a)
-                    + str(b)
-                    + str(counter),
+                    f"Edge{edges[i].left}{edges[i].right}{a}{b}",
                     cat="Binary",
                 )
             )
-        mu2.append(temp2)
-        temp2 = []
+        edge_var.append(temp)
 
     # Create optimization problem
     problem = LpProblem("myProblem", LpMinimize)
 
     # Constraint 1
-    for i in range(0, len(mu1)):
-        problem += lpSum(mu1[i]) == 1
+    for i in range(0, len(node_var)):
+        problem += lpSum(node_var[i]) == 1
 
-    # Constraint 2 ---> WORKS
-    for i in range(0, len(mu2)):
-        problem += lpSum(mu2[i]) == 1
+    # Constraint 2
+    for i in range(0, len(edge_var)):
+        problem += lpSum(edge_var[i]) == 1
 
     # Constraint 3 Left
-    for i in range(0, len(mu2)):
+    for i in range(0, len(edge_var)):
         test = True
         count = 0
         splitted = []
         while test:
-            splitted.append(mu2[i][count : count + len(mu1[edges[i].right])])
-            if count + len(mu1[edges[i].right]) >= len(mu2[i]):
+            splitted.append(edge_var[i][count : count + len(node_var[edges[i].right])])
+            if count + len(node_var[edges[i].right]) >= len(edge_var[i]):
                 test = False
             else:
-                count += len(mu1[edges[i].right])
+                count += len(node_var[edges[i].right])
         splitted = np.array(splitted)
         val = 0
         for m in range(0, len(splitted)):
@@ -95,20 +78,20 @@ def convert_to_ilp(nodes, edges):
             for k in range(0, len(splitted[m])):
                 temp3 += splitted[m][k]
             if val <= 4:
-                problem += temp3 == mu1[edges[i].left][val]
+                problem += temp3 == node_var[edges[i].left][val]
                 val += 1
 
     # Constraint 3 Right
-    for i in range(0, len(mu2)):
+    for i in range(0, len(edge_var)):
         test = True
         count = 0
         splitted = []
         while test:
-            splitted.append(mu2[i][count : count + len(mu1[edges[i].right])])
-            if count + len(mu1[edges[i].right]) >= len(mu2[i]):
+            splitted.append(edge_var[i][count : count + len(node_var[edges[i].right])])
+            if count + len(node_var[edges[i].right]) >= len(edge_var[i]):
                 test = False
             else:
-                count += len(mu1[edges[i].right])
+                count += len(node_var[edges[i].right])
         splitted = np.array(splitted).transpose()
         val = 0
         for m in range(0, len(splitted)):
@@ -117,106 +100,89 @@ def convert_to_ilp(nodes, edges):
             for k in range(0, len(splitted[m])):
                 temp3 += splitted[m][k]
             if val <= 4:
-                problem += temp3 == mu1[edges[i].right][val]
+                problem += temp3 == node_var[edges[i].right][val]
                 val += 1
 
     # What we want to minimize
     summe2 = 0
     summe1 = 0
-    for i in range(0, len(mu2)):
+    for i in range(0, len(edge_var)):
         for index, key in enumerate(edges[i].costs):
-            summe2 += mu2[i][index] * edges[i].costs[key]
-    for i in range(0, len(mu1)):
-        for h in range(0, len(mu1[i])):
-            summe1 += mu1[i][h] * nodes[i].costs[h]
+            summe2 += edge_var[i][index] * edges[i].costs[key]
+    for i in range(0, len(node_var)):
+        for h in range(0, len(node_var[i])):
+            summe1 += node_var[i][h] * nodes[i].costs[h]
     problem += summe1 + summe2
 
     solution = problem.solve()
-    print(solution)
 
-    return problem, solution
+    # In the terminal you can clearly see the correct solution but I dont know where to return it in the code as 'solution'
+    return problem, problem.objective.value()
 
 
 ####################################################################################################################################################
 # Method that returns the optimal labeling for a given solved ILP
-def ilp_to_labeling(nodes, edges, problem, omtimalValue):
+def ilp_to_labeling(_, __, problem, ___):
     solution = []
     for v in problem.variables():
         if str(v.name)[0] == "N" and v.varValue == 1:
             solution.append(int(str(v.name)[-1]))
-    return tuple(solution), omtimalValue
+    return tuple(solution)
 
 
 #################################################################################################################################################### EXERCISE 2.2
 def convert_to_lp(nodes, edges):
+    # Basically ilp but with continuous variables
 
-    # mu1 for the nodes
-    mu1 = []
-    temp1 = []
+    # node_var for the nodes
+    node_var = [
+        [
+            LpVariable(f"Node{i}{j}", cat="Continuous")
+            for j in range(len(nodes[i].costs))
+        ]
+        for i in range(0, len(nodes))
+    ]
 
     count = []
 
-    counter = 0
-    for i in range(0, len(nodes)):
-        for j in range(0, len(nodes[i].costs)):
-            counter += 1
-            temp1.append(
-                LpVariable(
-                    "Node" + str(i) + str(j) + str(counter),
-                    lowBound=0,
-                    upBound=1,
-                    cat="Continuous",
-                )
-            )
-            count.append("Node" + str(i) + str(j) + str(counter))
-        mu1.append(temp1)
-        temp1 = []
-
-    # mu2 for the edges
-    mu2 = []
-    temp2 = []
-    counter = 0
+    # edge_var for the edges
+    edge_var = []
     for i in range(0, len(edges)):
-        for (a, b), c in edges[i].costs.items():
-            counter += 1
+        temp2 = []
+        for (a, b), _ in edges[i].costs.items():
+
             temp2.append(
                 LpVariable(
-                    "Edge"
-                    + str(edges[i].left)
-                    + str(edges[i].right)
-                    + str(a)
-                    + str(b)
-                    + str(counter),
+                    f"Edge{edges[i].left}{edges[i].right}{a}{b}",
                     lowBound=0,
                     upBound=1,
                     cat="Continuous",
                 )
             )
-        mu2.append(temp2)
-        temp2 = []
+        edge_var.append(temp2)
 
     # Create optimization problem
     problem = LpProblem("myProblem", LpMinimize)
 
     # Constraint 1
-    for i in range(0, len(mu1)):
-        problem += lpSum(mu1[i]) == 1
+    for i in range(0, len(node_var)):
+        problem += lpSum(node_var[i]) == 1
 
     # Constraint 2 ---> WORKS
-    for i in range(0, len(mu2)):
-        problem += lpSum(mu2[i]) == 1
+    for i in range(0, len(edge_var)):
+        problem += lpSum(edge_var[i]) == 1
 
     # Constraint 3 Left
-    for i in range(0, len(mu2)):
+    for i in range(0, len(edge_var)):
         test = True
         count = 0
         splitted = []
         while test:
-            splitted.append(mu2[i][count : count + len(mu1[edges[i].right])])
-            if count + len(mu1[edges[i].right]) >= len(mu2[i]):
+            splitted.append(edge_var[i][count : count + len(node_var[edges[i].right])])
+            if count + len(node_var[edges[i].right]) >= len(edge_var[i]):
                 test = False
             else:
-                count += len(mu1[edges[i].right])
+                count += len(node_var[edges[i].right])
         splitted = np.array(splitted)
         val = 0
         for m in range(0, len(splitted)):
@@ -224,20 +190,20 @@ def convert_to_lp(nodes, edges):
             for k in range(0, len(splitted[m])):
                 temp3 += splitted[m][k]
             if val <= 4:
-                problem += temp3 == mu1[edges[i].left][val]
+                problem += temp3 == node_var[edges[i].left][val]
                 val += 1
 
     # Constraint 3 Right
-    for i in range(0, len(mu2)):
+    for i in range(0, len(edge_var)):
         test = True
         count = 0
         splitted = []
         while test:
-            splitted.append(mu2[i][count : count + len(mu1[edges[i].right])])
-            if count + len(mu1[edges[i].right]) >= len(mu2[i]):
+            splitted.append(edge_var[i][count : count + len(node_var[edges[i].right])])
+            if count + len(node_var[edges[i].right]) >= len(edge_var[i]):
                 test = False
             else:
-                count += len(mu1[edges[i].right])
+                count += len(node_var[edges[i].right])
         splitted = np.array(splitted).transpose()
         val = 0
         for m in range(0, len(splitted)):
@@ -246,38 +212,28 @@ def convert_to_lp(nodes, edges):
             for k in range(0, len(splitted[m])):
                 temp3 += splitted[m][k]
             if val <= 4:
-                problem += temp3 == mu1[edges[i].right][val]
+                problem += temp3 == node_var[edges[i].right][val]
                 val += 1
 
     # What we want to minimize
     summe2 = 0
     summe1 = 0
-    for i in range(0, len(mu2)):
+    for i in range(0, len(edge_var)):
         for index, key in enumerate(edges[i].costs):
-            summe2 += mu2[i][index] * edges[i].costs[key]
-    for i in range(0, len(mu1)):
-        for h in range(0, len(mu1[i])):
-            summe1 += mu1[i][h] * nodes[i].costs[h]
+            summe2 += edge_var[i][index] * edges[i].costs[key]
+    for i in range(0, len(node_var)):
+        for h in range(0, len(node_var[i])):
+            summe1 += node_var[i][h] * nodes[i].costs[h]
     problem += summe1 + summe2
 
-    # Solve the ILP
-    LpSolverDefault.msg = 0
+    solution = problem.solve()
 
-    # print(problem)
-    # status = problem.solve()
-    # Solve problem
-    # status = problem.solve(GLPK(msg = 0))
-    # m = GEKKO()
-    # m.Minimize(problem)
-    # m.solve()
-    # print(time.clock() - start_time, "seconds")
-
-    return problem, 12
+    return problem, problem.objective.value()
 
 
 ####################################################################################################################################################
-def lp_to_labeling(nodes, edges, problem, omtimalValue):
-    solution = []
+def lp_to_labeling(nodes, edges, problem, optimalValue):
+
     NODES = []
     EDGES = []
     assignment = []
@@ -291,7 +247,7 @@ def lp_to_labeling(nodes, edges, problem, omtimalValue):
     index = 0
     for i in range(0, len(nodes)):
         k = len(nodes[i].costs)
-        for j in range(0, len(nodes[i])):
+        for _ in range(0, len(nodes[i])):
             slicedArray = NODES[index : index + k]
             assignment.append(slicedArray.index(max(slicedArray)))
             index = index + k
@@ -304,38 +260,36 @@ def lp_to_labeling(nodes, edges, problem, omtimalValue):
     print("Optimal LP Energy: " + LP)
     print("Rounded LP Energy: " + rounded)
     print("Optimal ILP Energy: " + ILP)
-    return tuple(assignment)
+    print(assignment)
+    #### THE FIRST LABEL ONLY IS WRONG for 2.2
+    return tuple(assignment), optimalValue
 
 
 #################################################################################################################################################### EXERCISE 2.4
-def CalcExercise4():
+def test_models_2_4():
 
-    i = 1
-    for nodes, edges in model.ACYCLIC_MODELS:
+    solution_string = """\n\n# ACYCLIC #\n# MODELS #\n"""  # for the report
+
+    for i, (nodes, edges) in enumerate(ACYCLIC_MODELS, start=1):
         ILP = str(convert_to_ilp(nodes, edges)[1])
         LP = str(convert_to_lp(nodes, edges)[1])
-        print(i)
-        print("ILP " + ILP)
-        print("LP " + LP)
-        print()
-        i += 1
+        solution_string += f"Model {i}\n ILP {ILP}\n LP {LP}\n\n"
 
-    print()
-    print()
-    print()
+    solution_string += """\n\n# CYCLIC #\n# MODELS #\n"""  # for the report
 
-    i = 1
-    for nodes, edges in model.CYCLIC_MODELS:
+    for i, (nodes, edges) in enumerate(CYCLIC_MODELS):
         ILP = str(convert_to_ilp(nodes, edges)[1])
         LP = str(convert_to_lp(nodes, edges)[1])
-        print(i)
-        print("ILP " + ILP)
-        print("LP " + LP)
-        print()
-        i += 1
+        solution_string += f"Model {i}\n ILP {ILP}\n LP {LP}\n\n"
+
+    print(solution_string)
 
 
-######################################################################################################################################### EXERCISE 2.6
+######################################################################################################################################### EXERCISE 2.5
+
+# Did not do exercise 2.5
+
+########################################################################################################################################## EXERCISE 2.6
 
 
 def overSegmentation():
@@ -404,3 +358,8 @@ def overSegmentation():
     img.show()
     img.save("RESULT.png")
     print("Time: " + str(round(time.time() - start_time, 0)) + " seconds")
+
+
+if __name__ == "__main__":
+    test_models_2_4()
+    overSegmentation()

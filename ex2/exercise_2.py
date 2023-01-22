@@ -149,7 +149,7 @@ def convert_to_lp(nodes, edges):
     edge_var = []
     for i in range(0, len(edges)):
         temp2 = []
-        for (a, b), _ in edges[i].costs.items():
+        for (a, b), c in edges[i].costs.items():
 
             temp2.append(
                 LpVariable(

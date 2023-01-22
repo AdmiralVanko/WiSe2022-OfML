@@ -7,7 +7,10 @@
 # any changes to the interface, because the function will be used for automated
 # checks. It is fine to declare additional helper functions.
 
+import math
 
+INF = math.inf
+NR_LABELS = 0
 #
 # Iterated Conditional Modes (ICM)
 #
@@ -114,10 +117,15 @@ def subgradient_method(nodes, edges, grid, iterations=100):
 
 def min_sum_diffusion_accumulation(nodes, edges, grid, u):
     # Task: Implement the reparametrization for the accumulation phase of N:
-    neighbours = grid.neighbors(u)
-    for neighbour in neighbours:
-        print(grid.edge(u, neighbour))
-        print(grid.edges(u))
+    currentEdges = grid.edges(u)
+    for edge in currentEdges:
+        l = 1
+        print(edge.cost.items())
+    #neighbours = grid.neighbors(u)
+
+    #for neighbour in neighbours:
+        #currentEdge = grid.edge(u, neighbour)
+        #print([cost for cost in currentEdge.costs.items()])
 
 
 def min_sum_diffusion_distribution(nodes, edges, grid, u):
@@ -149,6 +157,7 @@ def min_sum_diffusion_single_iteration(nodes, edges, grid):
 def min_sum_diffusion_method(nodes, edges, grid):
     # Implement the Min-Sum diffusion method (run multiple iterations).
     # Return the assignment/labeling of the full model.
+    NR_LABELS = len(nodes[0].costs)
     labeling = []
     return labeling
 
@@ -195,3 +204,22 @@ def trws_method(nodes, edges, grid):
     # See Min-Sum diffusion, but implement anisotropic version.
     # `forward` is a boolean that specifies the current direction.
     pass
+
+def get_pencipls_for_node(node):
+    pass
+
+def get_pencils_for_edge(edge):
+    min_cost = INF
+    for label in range(NR_LABELS):
+        #find min pairwise cost:
+
+
+def modify_lebel_ur_costs_for_edge(edge, label):
+    min_cost = INF
+    for i in range(NR_LABELS):
+        if edge.costs[(label, i)] < min_cost:
+            min_cost = edge.costs[(label, i)]
+    # modify pairwise_costs
+    for i in range(NR_LABELS):
+        edge.costs[(label, i)] -= min_cost
+    #return the min_cost, to add to the label urinary cost
